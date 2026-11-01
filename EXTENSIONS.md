@@ -1,12 +1,13 @@
-# Wred extension contract v1.1 — Wred 0.15
+# Wred extension contract v1.2 — Wred 0.15
 
 Extensions add capabilities through ordinary Python callables. Wred does not
 discover plugins, maintain an extension registry, or depend on extension packages.
 This revision targets Wred 0.15 on Python 3.11+. Organization compatibility CI
 also tests Wred 0.14; individual packages may support 0.13 where their tests prove
 compatibility. Contract revisions and framework versions are independent.
-Revision 1.1 preserves the v1 callable interface and adds the 0.15 query semantics
-and explicit resource/failure requirements below.
+Revision 1.2 preserves the v1 callable interface and adds explicit HTTP hook and
+WebSocket ownership rules. Revision 1.1 introduced the 0.15 query semantics and
+resource/failure requirements below.
 
 ## Route decorators
 
@@ -205,3 +206,49 @@ preserves metadata. Context rendering can sit outside input injectors; put cachi
 outside rendering to store HTML bytes. Error mapping outside the renderer can
 handle template failures before a response starts. Describe HTML explicitly in
 OpenAPI rather than advertising the internal context as a JSON response.
+
+## HTTP hooks (revision 1.2)
+
+`wred-middleware` provides two distinct boundaries. Application before hooks receive
+raw HTTP scope and may rewrite routing/header/query inputs before construction of
+Wred's request. They must not impersonate a Wred Request or read body streams.
+Application after hooks mutate response status and ordered string header pairs
+before forwarding response start; body chunks, trailers and backpressure remain
+unchanged. They run on early responses as well. Changing bodyless status semantics
+is rejected. Hooks changing framing headers are responsible for consistency.
+
+Route before hooks receive the original Request; route after hooks receive and
+return native handler results. Preserve forms outside the hook's documented
+transformation, especially callable ASGI responses. Both forms execute before
+hooks in registration order and after/cleanup hooks in reverse. Returning None
+from a before hook continues; any other result short-circuits the remaining before
+hooks and application/handler. Route after hooks return the replacement result;
+application after hooks mutate ResponseHead and return None.
+
+App cleanup runs after the complete ASGI call; route cleanup runs after the
+handler returns, before execution of returned ASGI responses. All cleanup hooks
+are attempted even after partial setup. Original errors/cancellation win over
+cleanup failures; otherwise cleanup failures propagate. Hooks have independent
+finite positive deadlines, never retry the handler, and keep state request-local.
+HTTP hooks bypass websocket and lifespan scopes. Response transformations must
+keep OpenAPI and cache identity consistent with the resulting representation.
+
+## WebSocket ownership (revision 1.2)
+
+`wred-websockets.WebSockets` registers separate routes and owns websocket scopes.
+It delegates HTTP/lifespan unchanged, leaving Wred core untouched. Connections
+use Starlette's WebSocket interface and string path kwargs; they are not Wred
+Requests and do not use the HTTP decorator contract or HTTP OpenAPI operations.
+Registration is completed before serving; static paths take precedence, dynamic
+paths match in registration order, and mounts/trailing slashes follow Wred.
+
+Require explicit origin policy and authenticate/authorize before accepting.
+Origin is not identity, missing Origin is a separate opt-in, and HTTP CORS is not
+WebSocket protection. Selected subprotocols must be offered by the client.
+Bound per-worker admission, incoming/outgoing message bytes, handshakes and
+transport waits. Preserve backpressure; no unbounded queues or detached tasks.
+Coordinate server frame/queue limits because ASGI delivers assembled messages.
+Client disconnect is normal; application failures/cancellation propagate after
+best-effort close, with capacity released in finally. The server owns graceful
+shutdown; lifespan owns shared resources, and the application owns broker/fanout
+policy, session revocation, global quotas and connection-lifetime policy.

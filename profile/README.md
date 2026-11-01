@@ -19,7 +19,7 @@ async def hello(request, name):
 
 Handlers are async functions returning JSON-serializable values, bytes,
 `(body, headers, status)` tuples, or callable ASGI responses for streaming.
-Wred handles HTTP; optional ASGI wrappers add lifecycle and browser sharing policy.
+Wred handles HTTP; optional ASGI wrappers add lifecycle, browser sharing policy, middleware, and WebSocket routes.
 
 ## Philosophy
 
@@ -33,6 +33,8 @@ they can evolve together without becoming one large framework.
 
 | Package | Capability |
 |---|---|
+| [wred-middleware](https://github.com/wred-asgi/wred-middleware) | Async request/response hooks and streaming-safe HTTP policy |
+| [wred-websockets](https://github.com/wred-asgi/wred-websockets) | WebSocket routes, origin policy, bounded connections/messages |
 | [wred-jinja2](https://github.com/wred-asgi/wred-jinja2) | Async HTML templates, autoescaping, bounded rendering |
 | [wred-pydantic](https://github.com/wred-asgi/wred-pydantic) | Validation, serialization, OpenAPI, bundled Swagger UI |
 | [wred-auth](https://github.com/wred-asgi/wred-auth) | Bearer auth, accounts, sessions, roles, social login, MFA |

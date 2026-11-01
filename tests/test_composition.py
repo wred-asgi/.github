@@ -305,3 +305,147 @@ async def test_html_templates_compose_with_guards_cache_inputs_and_openapi():
         "text/html": {"schema": {"type": "string"}}
     }
     assert operation_schema["security"] == [{"bearerAuth": []}]
+
+
+async def test_http_hooks_compose_with_cached_html_auth_cors_and_metadata():
+    from wred_middleware import hooks, middleware_application
+
+    app = App()
+    auth = Auth(verifier=verify)
+    templates = Templates(loader=DictLoader({"page": "<p>{{ user }}</p>"}))
+    cleanups = []
+    calls = 0
+    counter = 0
+
+    async def identify(scope):
+        nonlocal counter
+        counter += 1
+        scope["example.id"] = str(counter)
+
+    async def headers(scope, head):
+        head.headers.append(("X-Request-ID", scope["example.id"]))
+
+    async def cleanup(scope, error):
+        cleanups.append(error)
+
+    async def context(request, result):
+        return {**result, "user": principal(request).id}
+
+    async with Cache() as cache:
+
+        @app.route("/items/{item_id}")
+        @auth.require_auth()
+        @cache.cache(private=True, key=lambda r: (principal(r).id, r.path))
+        @templates.template("page")
+        @hooks(after=context)
+        @path(Route)
+        async def endpoint(request, item_id, path):
+            nonlocal calls
+            calls += 1
+            return {"item": path.item_id}
+
+        wrapped = cors_application(
+            middleware_application(
+                app, before=identify, after=headers, cleanup=cleanup
+            ),
+            allow_origins=["https://client.example"],
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(wrapped), base_url="http://test"
+        ) as client:
+            for token in ["alice", "alice", "bob"]:
+                result = await client.get(
+                    "/items/7",
+                    headers={
+                        "authorization": "Bearer " + token,
+                        "origin": "https://client.example",
+                    },
+                )
+                assert result.text == f"<p>{token}</p>"
+                assert result.headers["x-request-id"] == str(counter)
+                assert (
+                    result.headers["access-control-allow-origin"]
+                    == "https://client.example"
+                )
+            denied = await client.get("/items/7")
+            assert denied.status_code == 401 and denied.headers["x-request-id"] == "4"
+        assert calls == 2 and cleanups == [None] * 4
+        assert (
+            endpoint.__wred_openapi__["path"]["properties"]["item_id"]["type"]
+            == "integer"
+        )
+
+
+async def test_websockets_pass_through_http_policy_and_single_lifespan_owner():
+    from wred_middleware import middleware_application
+    from wred_websockets import WebSockets
+
+    app = App()
+    sockets = WebSockets(app, allowed_origins=["https://client.example"])
+    lifecycle = []
+
+    async def start():
+        lifecycle.append("start")
+
+    async def stop():
+        lifecycle.append("stop")
+
+    async def http_only(scope):
+        assert scope["type"] == "http"
+
+    @sockets.route("/room/{room}")
+    async def echo(websocket, room):
+        await websocket.accept()
+        await websocket.send_text(room)
+
+    @app.route("/health")
+    async def health(request):
+        return {"ok": True}
+
+    wrapped = lifespan_application(
+        cors_application(
+            middleware_application(sockets, before=http_only),
+            allow_origins=["https://client.example"],
+        ),
+        on_start=start,
+        on_shutdown=stop,
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(wrapped), base_url="http://test"
+    ) as client:
+        assert (await client.get("/health")).json() == {"ok": True}
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    async def connect():
+        return {"type": "websocket.connect"}
+
+    await wrapped(
+        {
+            "type": "websocket",
+            "path": "/room/general",
+            "headers": [(b"origin", b"https://client.example")],
+        },
+        connect,
+        send,
+    )
+    assert [m["type"] for m in sent] == [
+        "websocket.accept",
+        "websocket.send",
+        "websocket.close",
+    ]
+    assert sent[1]["text"] == "general"
+    messages = iter([{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}])
+
+    async def receive():
+        return next(messages)
+
+    sent.clear()
+    await wrapped({"type": "lifespan"}, receive, send)
+    assert lifecycle == ["start", "stop"]
+    assert [m["type"] for m in sent] == [
+        "lifespan.startup.complete",
+        "lifespan.shutdown.complete",
+    ]

@@ -19,9 +19,11 @@ PACKAGES = {
     "errors": "test",
     "jinja2": "test",
     "lifespan": "test",
+    "middleware": "test",
     "pagination": "test,sqlalchemy",
     "pydantic": "test",
     "ratelimit": "test,redis",
+    "websockets": "test",
 }
 
 

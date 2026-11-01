@@ -1,0 +1,17 @@
+{
+  "workers": 2,
+  "connections": 100,
+  "websocket_messages": 10000,
+  "http_requests": 2000,
+  "elapsed_seconds": 1.503,
+  "websocket_roundtrip_median_ms": 6.196,
+  "websocket_roundtrip_p95_ms": 16.662,
+  "versions": {
+    "wred": "0.15",
+    "wred-middleware": "0.1.0",
+    "wred-websockets": "0.1.0",
+    "starlette": "1.10.0",
+    "uvicorn": "0.54.0",
+    "websockets": "17.4"
+  }
+}

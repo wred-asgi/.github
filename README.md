@@ -3,7 +3,7 @@
 Shared resources for the [Wred organization](https://github.com/wred-asgi).
 
 - [Organization profile](profile/README.md)
-- [Extension contract v1.1](EXTENSIONS.md)
+- [Extension contract v1.2](EXTENSIONS.md)
 - [Production readiness and migration](PRODUCTION.md)
 - [Organization validation workflow](.github/workflows/extensions.yml)
 - [Cross-extension composition tests](tests/test_composition.py)
@@ -19,6 +19,7 @@ python -m venv .venv
 python -m pip install -e ../wred \
   -e '../wred-auth[test]' -e '../wred-cache[test]' \
   -e '../wred-cors[test]' -e '../wred-errors[test]' \
+  -e '../wred-middleware[test]' -e '../wred-websockets[test]' \
   -e '../wred-jinja2[test]' -e '../wred-lifespan[test]' -e '../wred-pagination[test]' \
   -e '../wred-pydantic[test]' -e '../wred-ratelimit[test]'
 python -m pytest tests

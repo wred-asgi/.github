@@ -9,6 +9,8 @@ rollout. Wred remains a small HTTP core; extensions do not require a core regist
 
 | Package | Candidate | Operational boundary |
 |---|---|---|
+| wred-middleware | 0.1.0 | Streaming-safe HTTP hooks; 5s/hook deadline; cleanup preserves primary failures; no implicit body buffering |
+| wred-websockets | 0.1.0 | Explicit origins; 1,000 connections/worker; 64 KiB messages; handshake/receive/send deadlines; server limits also required |
 | wred-jinja2 | 0.1.0 | Autoescaped HTML; strict undefined values; 1 MiB output, 32 renders/worker, 5s cooperative deadline; trusted templates only |
 | wred-auth | 0.2.0 | Transactional accounts; bounded Argon2 work; 64 KiB account request bodies; shared quotas required across workers |
 | wred-cache | 0.2.0 | 1 MiB encoded entries; 64 MiB retained memory values; bounded metadata/locks; Redis deadlines and lease-checked publication |
@@ -19,9 +21,9 @@ rollout. Wred remains a small HTTP core; extensions do not require a core regist
 | wred-pydantic | 0.2.1 | Streaming body limits; bounded input validation; preserved native responses; locally bundled Swagger UI 5.34.1 loaded at mount |
 | wred-ratelimit | 0.1.1 | Atomic Redis quotas; bounded pools/deadlines; fail closed by default; trusted peer identity |
 
-All nine candidates admit Wred 0.15 and Python >=3.11. The shared contract is
-[revision 1.1](EXTENSIONS.md); its revision is independent of the Wred version.
-CORS, lifespan, and Jinja require Wred >=0.14; the other extensions also declare
+All eleven candidates admit Wred 0.15 and Python >=3.11. The shared contract is
+[revision 1.2](EXTENSIONS.md); its revision is independent of the Wred version.
+CORS, lifespan, Jinja, middleware, and WebSockets require Wred >=0.14; the other extensions also declare
 0.13 support.
 Organization CI covers 0.14 and 0.15. The Pydantic tox matrix additionally covers
 0.13. Test older per-package combinations before selecting them for deployment.
@@ -91,7 +93,7 @@ Organization CI covers 0.14 and 0.15. The Pydantic tox matrix additionally cover
 
 ## Reproducible gates
 
-The [validation script](scripts/validate.py) resolves all nine source checkouts,
+The [validation script](scripts/validate.py) resolves all eleven source checkouts,
 checks dependencies, builds wheels and sdists, rebuilds every sdist, installs the
 wheels, and runs copied package/composition tests away from the source directories.
 It requires service URLs instead of silently skipping all service coverage. It
@@ -157,3 +159,30 @@ allocations or blocking CPU work. Map overload/timeouts explicitly and test the
 actual templates/data. See [wred-jinja2](https://github.com/wred-asgi/wred-jinja2) for
 response passthrough, caching order, OpenAPI documentation, and resource limits.
 The earlier dated eight-extension audit predates this addition.
+
+## HTTP hooks and WebSockets
+
+Middleware application before hooks edit the raw scope before Wred builds its
+request; response hooks only edit headers/status. Bodies remain streaming and
+unconsumed. Route hooks may transform native results while preserving callable
+ASGI responses. App cleanup covers the stream; route cleanup covers only handler
+execution. Keep CORS outside early-response hooks. Hook deadlines are per hook,
+not a total request deadline; bound external I/O and cleanup work accordingly.
+
+WebSockets owns only websocket scopes; HTTP middleware, CORS and lifespan must
+forward that protocol. Browser origins are denied unless explicitly allowed;
+missing Origin requires a separate opt-in. Authenticate before acceptance,
+authorize subscriptions/actions, and handle session expiry/revocation. HTTP route
+auth/cache/pagination decorators are not WebSocket connection decorators.
+
+Admission and message limits are per worker. Server frame/message and queue caps
+must also be set: ASGI applications see already assembled messages. Transport
+pings do not reset an application receive deadline. There is no implicit broker,
+shared room registry, or fleet-wide quota. Bound broadcast subscriber queues and
+choose a slow-consumer policy in any broker integration. Test proxy idle timeouts,
+reconnection storms, shutdown draining, and representative multiworker load before
+rollout. The new packages' real-transport tests cover one and two Uvicorn workers;
+they are correctness evidence, not a capacity certification.
+
+See the [middleware/WebSocket validation record](AUDIT-2026-11-01-TRANSPORT.md)
+for installed-wheel results and a reproducible two-worker transport load smoke.
