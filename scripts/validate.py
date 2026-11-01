@@ -61,6 +61,9 @@ def main():
         constraints.append(f"starlette=={options.starlette}")
     if options.minimum:
         constraints.extend(["-c", str(organization / "constraints-minimum.txt")])
+    # Hosted Python installations may bundle vulnerable packaging tools. They are
+    # part of the audited environment, even in the minimum runtime matrix.
+    run("-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel")
     run("-m", "pip", "install", *requirements, *constraints, "build", "pip-audit")
     run("-m", "pip", "check")
     with tempfile.TemporaryDirectory(prefix="wred-validation-") as directory:
