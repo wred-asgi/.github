@@ -61,8 +61,10 @@ jobs:
           done
       - name: Start MongoDB replica set
         run: |
+          # MongoDB 7.0 avoids the hosted runner kernel/8.x incompatibility.
+          # https://jira.mongodb.org/browse/SERVER-125742
           trap 'docker logs wred-mongo || true' ERR
-          docker run -d --name wred-mongo -p 27017:27017 mongo:8.0 --replSet wred --bind_ip_all
+          docker run -d --name wred-mongo -p 27017:27017 mongo:7.0 --replSet wred --bind_ip_all
           for i in $(seq 1 60); do
             if docker exec wred-mongo mongosh --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
             if [ "$(docker inspect -f '{{.State.Running}}' wred-mongo)" != true ]; then docker logs wred-mongo; exit 1; fi

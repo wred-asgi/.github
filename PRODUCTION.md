@@ -129,3 +129,14 @@ load establish specific behavior; they do not establish regional failover,
 production SLOs, maximum throughput, live Google/GitHub tenant configuration,
 email deliverability, or a formal security audit. Production admission requires
 those application-specific checks and sustained load/soak testing.
+
+## MongoDB host compatibility
+
+CI uses the maintained MongoDB 7.0 release line on hosted runners. MongoDB's
+[compatibility matrix](https://jira.mongodb.org/browse/SERVER-125742) identifies
+7.0 as unaffected by the kernel/TCMalloc issue that blocks some 8.x builds on
+current hosted kernels. Local service validation also exercised MongoDB 8.2.9 on
+Linux 6.17; that is test evidence, not a recommendation to deploy that release.
+For production MongoDB 8.x, use a maintained release and verify its exact host
+kernel against the [production notes](https://www.mongodb.com/docs/manual/administration/production-notes/).
+Do not disable startup safety checks to make CI or deployment appear healthy.
