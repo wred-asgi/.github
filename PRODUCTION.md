@@ -9,6 +9,7 @@ rollout. Wred remains a small HTTP core; extensions do not require a core regist
 
 | Package | Candidate | Operational boundary |
 |---|---|---|
+| wred-jinja2 | 0.1.0 | Autoescaped HTML; strict undefined values; 1 MiB output, 32 renders/worker, 5s cooperative deadline; trusted templates only |
 | wred-auth | 0.2.0 | Transactional accounts; bounded Argon2 work; 64 KiB account request bodies; shared quotas required across workers |
 | wred-cache | 0.2.0 | 1 MiB encoded entries; 64 MiB retained memory values; bounded metadata/locks; Redis deadlines and lease-checked publication |
 | wred-cors | 0.2.0 | Exact-origin lookup; streaming and duplicate-header preservation; Starlette >=1.3.1,<2 |
@@ -18,7 +19,7 @@ rollout. Wred remains a small HTTP core; extensions do not require a core regist
 | wred-pydantic | 0.2.1 | Streaming body limits; bounded input validation; preserved native responses; locally bundled Swagger UI 5.34.1 loaded at mount |
 | wred-ratelimit | 0.1.1 | Atomic Redis quotas; bounded pools/deadlines; fail closed by default; trusted peer identity |
 
-All candidates admit Wred 0.15 and Python >=3.11. The shared contract is
+All nine candidates admit Wred 0.15 and Python >=3.11. The shared contract is
 [revision 1.1](EXTENSIONS.md); its revision is independent of the Wred version.
 CORS/lifespan require Wred >=0.14; other extensions also declare 0.13 support.
 Organization CI covers 0.14 and 0.15. The Pydantic tox matrix additionally covers
@@ -89,7 +90,7 @@ Organization CI covers 0.14 and 0.15. The Pydantic tox matrix additionally cover
 
 ## Reproducible gates
 
-The [validation script](scripts/validate.py) resolves all eight source checkouts,
+The [validation script](scripts/validate.py) resolves all nine source checkouts,
 checks dependencies, builds wheels and sdists, rebuilds every sdist, installs the
 wheels, and runs copied package/composition tests away from the source directories.
 It requires service URLs instead of silently skipping all service coverage. It
@@ -140,3 +141,18 @@ Linux 6.17; that is test evidence, not a recommendation to deploy that release.
 For production MongoDB 8.x, use a maintained release and verify its exact host
 kernel against the [production notes](https://www.mongodb.com/docs/manual/administration/production-notes/).
 Do not disable startup safety checks to make CI or deployment appear healthy.
+
+## HTML template rendering
+
+`wred-jinja2` renders mapping contexts to native UTF-8 HTML responses. Reuse one
+environment per worker, configure it before serving, and preload the working set
+(including inheritance/import dependencies) within its bounded cache. Jinja loader
+I/O and compilation remain synchronous; async helpers are awaited. Never put
+request context in globals or load untrusted template source. Keep auth outside
+private HTML caching and include all representation inputs in cache keys.
+
+Rendering limits apply to generated output and active renders, not all application
+allocations or blocking CPU work. Map overload/timeouts explicitly and test the
+actual templates/data. See [wred-jinja2](https://github.com/wred-asgi/wred-jinja2) for
+response passthrough, caching order, OpenAPI documentation, and resource limits.
+The earlier dated eight-extension audit predates this addition.

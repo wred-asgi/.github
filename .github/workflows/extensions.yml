@@ -52,7 +52,7 @@ jobs:
           REPOSITORY: ${{ github.event.repository.name }}
         run: |
           mkdir ecosystem
-          for name in .github wred-auth wred-cache wred-cors wred-errors wred-lifespan wred-pagination wred-pydantic wred-ratelimit; do
+          for name in .github wred-auth wred-cache wred-cors wred-errors wred-jinja2 wred-lifespan wred-pagination wred-pydantic wred-ratelimit; do
             if [ "$name" = "$REPOSITORY" ]; then
               cp -a changed "ecosystem/$name"
             else

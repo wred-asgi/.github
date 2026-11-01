@@ -38,6 +38,10 @@ def extension(*, option=None):
 - Transform only documented response forms. Pydantic normalizes successful bodies
   but passes through callable responses, non-2xx tuples, and 204/205 tuples. Caching
   bypasses callable, private, unsuccessful, and nonserializable responses.
+  Jinja renders mapping contexts and successful mapping tuples as UTF-8 HTML bytes;
+  it passes through other native responses and non-body/error tuples. Rendering
+  replaces Content-Type and removes Content-Length for the new representation,
+  preserving other ordered header pairs.
 - Propagate unhandled exceptions and cancellation. Error mapping covers handler
   invocation, not later execution of a returned ASGI response.
 - Validate configuration early. Document backend failures and fail-open/closed
@@ -192,3 +196,12 @@ production capacity guarantee.
 
 See [production readiness and rollout](PRODUCTION.md) for defaults, migration,
 repeatable checks, and the limits of the current evidence.
+
+## HTML templates
+
+Keep template sources trusted and shared environments free of request state.
+`wred-jinja2` reserves `request` in render context, forwards handler arguments, and
+preserves metadata. Context rendering can sit outside input injectors; put caching
+outside rendering to store HTML bytes. Error mapping outside the renderer can
+handle template failures before a response starts. Describe HTML explicitly in
+OpenAPI rather than advertising the internal context as a JSON response.

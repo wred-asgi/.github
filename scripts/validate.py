@@ -17,6 +17,7 @@ PACKAGES = {
     "cache": "test,redis",
     "cors": "test",
     "errors": "test",
+    "jinja2": "test",
     "lifespan": "test",
     "pagination": "test,sqlalchemy",
     "pydantic": "test",

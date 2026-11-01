@@ -7,15 +7,17 @@ from itertools import permutations
 
 import httpx
 import pytest
+from jinja2 import DictLoader
 from pydantic import BaseModel, ConfigDict
 from wred import App, Request
 from wred_auth import Auth, AuthError, Principal, principal
 from wred_cache import Cache
 from wred_cors import cors_application
 from wred_errors import handle_errors
+from wred_jinja2 import Templates
 from wred_lifespan import lifespan_application
 from wred_pagination import paginate
-from wred_pydantic import OpenAPI, path, query, response
+from wred_pydantic import OpenAPI, operation, path, query, response
 from wred_ratelimit import Limiter
 
 
@@ -237,3 +239,69 @@ async def test_argument_context_is_released_when_the_stack_unwinds(failure):
         assert await handler(request, item_id="7") == 7
         assert await handler(request, item_id="8") == 8
     assert "wred.extensions.route_kwargs" not in request.scope
+
+
+async def test_html_templates_compose_with_guards_cache_inputs_and_openapi():
+    app = App()
+    templates = Templates(
+        loader=DictLoader(
+            {"page": "<h1>{{ label }}</h1>{{ user }}:{{ item_id }}:{{ limit }}"}
+        )
+    )
+    auth = Auth(verifier=verify)
+    calls = 0
+    async with Cache() as cache:
+
+        @app.route("/items/{item_id}")
+        @auth.require_auth()
+        @cache.cache(private=True, key=lambda r: (principal(r).id, r.path, r.query))
+        @templates.template("page")
+        @paginate()
+        @query(Filters)
+        @path(Route)
+        @operation(
+            responses={
+                200: {
+                    "description": "HTML page",
+                    "content": {"text/html": {"schema": {"type": "string"}}},
+                }
+            }
+        )
+        async def handler(request, item_id, pagination, query, path):
+            nonlocal calls
+            calls += 1
+            return {
+                "label": query.label,
+                "user": principal(request).id,
+                "item_id": path.item_id,
+                "limit": pagination.limit,
+            }
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            for token in ("alice", "bob"):
+                for _ in range(2):
+                    result = await client.get(
+                        "/items/7",
+                        params={"label": "<tag>", "limit": "2"},
+                        headers={"authorization": "Bearer " + token},
+                    )
+                    assert result.text == f"<h1>&lt;tag&gt;</h1>{token}:7:2"
+                    assert result.headers["content-type"] == "text/html; charset=utf-8"
+            assert calls == 2
+            assert (await client.get("/items/7?label=x")).status_code == 401
+            invalid = await client.get(
+                "/items/no?label=x", headers={"authorization": "Bearer alice"}
+            )
+            assert invalid.status_code == 422
+            assert invalid.headers["content-type"] == "application/json"
+
+    document = OpenAPI(
+        app, security_schemes={"bearerAuth": {"type": "http", "scheme": "bearer"}}
+    ).document()
+    operation_schema = document["paths"]["/items/{item_id}"]["get"]
+    assert operation_schema["responses"]["200"]["content"] == {
+        "text/html": {"schema": {"type": "string"}}
+    }
+    assert operation_schema["security"] == [{"bearerAuth": []}]

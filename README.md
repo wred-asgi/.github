@@ -19,7 +19,7 @@ python -m venv .venv
 python -m pip install -e ../wred \
   -e '../wred-auth[test]' -e '../wred-cache[test]' \
   -e '../wred-cors[test]' -e '../wred-errors[test]' \
-  -e '../wred-lifespan[test]' -e '../wred-pagination[test]' \
+  -e '../wred-jinja2[test]' -e '../wred-lifespan[test]' -e '../wred-pagination[test]' \
   -e '../wred-pydantic[test]' -e '../wred-ratelimit[test]'
 python -m pytest tests
 ```

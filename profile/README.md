@@ -33,6 +33,7 @@ they can evolve together without becoming one large framework.
 
 | Package | Capability |
 |---|---|
+| [wred-jinja2](https://github.com/wred-asgi/wred-jinja2) | Async HTML templates, autoescaping, bounded rendering |
 | [wred-pydantic](https://github.com/wred-asgi/wred-pydantic) | Validation, serialization, OpenAPI, bundled Swagger UI |
 | [wred-auth](https://github.com/wred-asgi/wred-auth) | Bearer auth, accounts, sessions, roles, social login, MFA |
 | [wred-ratelimit](https://github.com/wred-asgi/wred-ratelimit) | Memory/Redis handler quotas |
