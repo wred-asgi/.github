@@ -1,0 +1,181 @@
+{
+  "date": "2026-11-01",
+  "platform": "Linux-6.17.0-1023-oem-x86_64-with-glibc2.43",
+  "python": "3.14.4",
+  "notes": [
+    "Single shared development host; runs are not isolated capacity measurements.",
+    "Auth/cache/quota calls exclude HTTP. CORS uses localhost HTTP with client and server on the same host.",
+    "Overload auth uses two password jobs and four concurrent calls per worker; 503 is controlled admission rejection."
+  ],
+  "results": {
+    "auth_postgresql_normal": {
+      "backend": "sql",
+      "workers": 2,
+      "concurrency_per_worker": 2,
+      "requests": 1000,
+      "elapsed_seconds": 4.426,
+      "requests_per_second": 226.0,
+      "outcomes": {
+        "authenticate:ok": 900,
+        "login:ok": 100
+      },
+      "login_ms": {
+        "p50": 115.52,
+        "p95": 161.22,
+        "max": 182.26
+      },
+      "authenticate_ms": {
+        "p50": 3.55,
+        "p95": 9.33,
+        "max": 22.34
+      }
+    },
+    "auth_mongodb_normal": {
+      "backend": "mongodb",
+      "workers": 2,
+      "concurrency_per_worker": 2,
+      "requests": 1000,
+      "elapsed_seconds": 4.09,
+      "requests_per_second": 244.5,
+      "outcomes": {
+        "authenticate:ok": 900,
+        "login:ok": 100
+      },
+      "login_ms": {
+        "p50": 116.53,
+        "p95": 154.48,
+        "max": 170.15
+      },
+      "authenticate_ms": {
+        "p50": 3.37,
+        "p95": 8.29,
+        "max": 18.27
+      }
+    },
+    "auth_postgresql_overload": {
+      "backend": "sql",
+      "workers": 2,
+      "concurrency_per_worker": 4,
+      "requests": 1000,
+      "elapsed_seconds": 1.171,
+      "requests_per_second": 854.1,
+      "outcomes": {
+        "authenticate:ok": 900,
+        "login:503": 65,
+        "login:ok": 35
+      },
+      "login_ms": {
+        "p50": 3.16,
+        "p95": 108.64,
+        "max": 121.81
+      },
+      "authenticate_ms": {
+        "p50": 2.4,
+        "p95": 8.38,
+        "max": 16.44
+      }
+    },
+    "auth_mongodb_overload": {
+      "backend": "mongodb",
+      "workers": 2,
+      "concurrency_per_worker": 4,
+      "requests": 1000,
+      "elapsed_seconds": 1.358,
+      "requests_per_second": 736.5,
+      "outcomes": {
+        "authenticate:ok": 900,
+        "login:503": 63,
+        "login:ok": 37
+      },
+      "login_ms": {
+        "p50": 4.65,
+        "p95": 138.78,
+        "max": 151.07
+      },
+      "authenticate_ms": {
+        "p50": 3.78,
+        "p95": 9.75,
+        "max": 21.53
+      }
+    },
+    "rate_limit": {
+      "workers": 4,
+      "concurrency": 25,
+      "requests": 10000,
+      "identities": 1000,
+      "quota": 5,
+      "strategy": "moving",
+      "timeout": 0.5,
+      "namespace": "wred-benchmark-648014d1a4af486c8b59a90bee9ebae6",
+      "elapsed_seconds": 0.302,
+      "requests_per_second": 33069,
+      "latency_ms": {
+        "p50": 2.334,
+        "p95": 4.071,
+        "p99": 6.595
+      },
+      "statuses": {
+        "200": 5000,
+        "429": 5000
+      },
+      "expected_allowed": 5000,
+      "quota_correct": true
+    },
+    "cache": {
+      "workers": 4,
+      "concurrency": 25,
+      "requests": 10000,
+      "phases": [
+        {
+          "revision": 1,
+          "requests": 10000,
+          "errors": 0,
+          "seconds": 0.448,
+          "requests_per_second": 22343.9,
+          "p95_ms": 4.449
+        },
+        {
+          "revision": 2,
+          "requests": 10000,
+          "errors": 0,
+          "seconds": 0.452,
+          "requests_per_second": 22143.2,
+          "p95_ms": 4.595
+        }
+      ],
+      "fills": 20
+    },
+    "cors_http": {
+      "mode": "cors",
+      "transport": "http",
+      "requests": 2000,
+      "concurrency": 50,
+      "workers": 2,
+      "configured_origins": 10000,
+      "seconds": 5.669,
+      "requests_per_second": 352.8,
+      "p50_ms": 99.342,
+      "p95_ms": 321.662,
+      "errors": 0,
+      "error_samples": [],
+      "workers_observed": 2,
+      "python": "3.14.4"
+    },
+    "cors_preflight_http": {
+      "mode": "preflight",
+      "transport": "http",
+      "requests": 2000,
+      "concurrency": 50,
+      "workers": 2,
+      "configured_origins": 10000,
+      "seconds": 6.828,
+      "requests_per_second": 292.9,
+      "p50_ms": 116.459,
+      "p95_ms": 387.946,
+      "errors": 0,
+      "error_samples": [],
+      "workers_observed": 0,
+      "python": "3.14.4"
+    }
+  }
+}

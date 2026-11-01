@@ -73,3 +73,7 @@ Close resources with lifecycle shutdown hooks. Put auth and quotas outside cachi
 when they must run on hits. Use shared storage for multiworker quotas and cache
 invalidation. See the [contract and production guidance](https://github.com/wred-asgi/.github/blob/main/EXTENSIONS.md) for
 ordering, request state, metadata, and compatibility expectations.
+
+The current baseline targets **Wred 0.15**. Read the [production and migration guide](https://github.com/wred-asgi/.github/blob/main/PRODUCTION.md)
+for per-package limits, shared storage, failure policy, and reproducible release
+gates. Candidate source compatibility does not imply every package is published.

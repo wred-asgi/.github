@@ -1,0 +1,80 @@
+name: Organization extension compatibility
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '21 6 * * 1'
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {python: '3.11', wred: '0.14', starlette: '1.3.1'}
+          - {python: '3.11', wred: '0.15', starlette: '1.3.1'}
+          - {python: '3.12', wred: '0.15', starlette: ''}
+          - {python: '3.13', wred: '0.15', starlette: ''}
+          - {python: '3.14', wred: '0.15', starlette: ''}
+    services:
+      redis:
+        image: redis:7.4
+        ports: ['6379:6379']
+        options: --health-cmd 'redis-cli ping' --health-interval 5s --health-timeout 3s --health-retries 10
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wred
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: wred
+        ports: ['5432:5432']
+        options: --health-cmd 'pg_isready -U wred' --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      WRED_TEST_REDIS: redis://127.0.0.1:6379/15
+      WRED_TEST_POSTGRES: postgresql+asyncpg://wred:ci-only@127.0.0.1:5432/wred
+      WRED_TEST_MONGODB: mongodb://127.0.0.1:27017/?replicaSet=wred
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: changed
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Assemble the candidate with current organization packages
+        env:
+          REPOSITORY: ${{ github.event.repository.name }}
+        run: |
+          mkdir ecosystem
+          for name in .github wred-auth wred-cache wred-cors wred-errors wred-lifespan wred-pagination wred-pydantic wred-ratelimit; do
+            if [ "$name" = "$REPOSITORY" ]; then
+              cp -a changed "ecosystem/$name"
+            else
+              git clone --depth 1 "https://github.com/wred-asgi/$name.git" "ecosystem/$name"
+            fi
+          done
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name wred-mongo -p 27017:27017 mongo:8 --replSet wred --bind_ip_all
+          for i in $(seq 1 60); do
+            if docker exec wred-mongo mongosh --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
+            sleep 1
+          done
+          docker exec wred-mongo mongosh --quiet --eval 'rs.initiate({_id:"wred",members:[{_id:0,host:"localhost:27017"}]})'
+          for i in $(seq 1 60); do
+            if docker exec wred-mongo mongosh --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)'; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Validate distributions, service behavior and dependency advisories
+        env:
+          STARLETTE: ${{ matrix.starlette }}
+          WRED: ${{ matrix.wred }}
+        run: |
+          args=()
+          if [ -n "$STARLETTE" ]; then args+=(--starlette "$STARLETTE" --minimum); fi
+          python ecosystem/.github/scripts/validate.py --extensions ecosystem --wred "$WRED" "${args[@]}"

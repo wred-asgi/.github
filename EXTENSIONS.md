@@ -1,9 +1,12 @@
-# Wred extension contract v1
+# Wred extension contract v1.1 — Wred 0.15
 
 Extensions add capabilities through ordinary Python callables. Wred does not
 discover plugins, maintain an extension registry, or depend on extension packages.
-This contract targets Wred 0.14 on Python 3.11+. Packages may additionally support
-0.13 where their own tests prove compatibility.
+This revision targets Wred 0.15 on Python 3.11+. Organization compatibility CI
+also tests Wred 0.14; individual packages may support 0.13 where their tests prove
+compatibility. Contract revisions and framework versions are independent.
+Revision 1.1 preserves the v1 callable interface and adds the 0.15 query semantics
+and explicit resource/failure requirements below.
 
 ## Route decorators
 
@@ -70,6 +73,22 @@ must use package-owned scope keys, never global request state. `wred.auth` belon
 to authentication; read it through `wred_auth.principal(request)`. Read bodies
 through Wred's cached `body()`/`json()` methods. Restore temporary receive wrappers
 in `finally`.
+
+## Query decoding in Wred 0.15
+
+Use `request.query` for decoded application values. Wred decodes raw ASGI query
+bytes as UTF-8 with replacement, then applies `parse_qsl(..., keep_blank_values=True)`
+and returns a dictionary. Percent escapes are decoded, `+` becomes space, blank
+values survive, repeated names use their last value, and malformed UTF-8 becomes
+U+FFFD. Extensions must not reinterpret replacement characters as valid numbers or
+silently discard them to make validation succeed. Malformed numeric pagination
+values return 422; string validators may accept the replacement character.
+
+Different byte sequences can decode to the same string. Signature verification,
+canonicalization, duplicate-sensitive inputs, and default cache identity must use
+`scope["query_string"]` where exact bytes matter. Do not assume this dictionary is
+a lossless multimap. Wred 0.14 could raise on malformed raw UTF-8; extensions may
+retain their older compatibility handling without changing 0.15 semantics.
 
 ## Metadata
 
@@ -150,3 +169,26 @@ with explicit namespaces, bounded pools, timeouts, and an outage policy. Set
 ingress size limits, worker concurrency, and shutdown budgets. Run service tests
 and workload-specific benchmarks before rollout; in-process throughput is not a
 production capacity guarantee.
+
+## Resource and failure contract
+
+- Bound retained cache values, invalidation metadata, fill-lock cardinality, and
+  external connection pools. Bound backend waits separately from handler time.
+  Evicted or expired invalidation metadata must create a fresh generation. A fill
+  whose Redis lease expired must not overwrite a newer fill.
+- Do not cache `Set-Cookie`, `Vary: *`, or `private`, `no-store`, or `no-cache`
+  responses. Honor request `no-store` and `no-cache`. Explicit keys transfer
+  responsibility for representation and authorization isolation to the caller.
+- Check body limits while receiving chunks, even without `Content-Length`. Check
+  bodies already buffered by an outer wrapper too. Ingress limits are still
+  required to bound allocations made before the extension runs.
+- Bound pagination limits and offsets by default. Prefer indexed keyset pagination
+  for deep traversal. Validate finite positive deadlines and TTLs at configuration.
+- Cache outages bypass storage; failed invalidations propagate. Quotas fail closed
+  by default; auth storage outages must not become successful authentication.
+  Preserve handler errors and cancellation even if cleanup fails.
+- Initialize shared clients and static assets once per worker. Own and close
+  resources explicitly. Libraries cannot forcibly stop blocking application code.
+
+See [production readiness and rollout](PRODUCTION.md) for defaults, migration,
+repeatable checks, and the limits of the current evidence.

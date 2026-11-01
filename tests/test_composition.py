@@ -2,11 +2,13 @@
 
 import asyncio
 import inspect
+from importlib.metadata import version
 from itertools import permutations
 
 import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict
+from wred import App, Request
 from wred_auth import Auth, AuthError, Principal, principal
 from wred_cache import Cache
 from wred_cors import cors_application
@@ -15,8 +17,6 @@ from wred_lifespan import lifespan_application
 from wred_pagination import paginate
 from wred_pydantic import OpenAPI, path, query, response
 from wred_ratelimit import Limiter
-
-from wred import App, Request
 
 
 class Route(BaseModel):
@@ -72,6 +72,37 @@ async def verify(token):
     if token not in ("alice", "bob"):
         raise AuthError()
     return Principal(token)
+
+
+@pytest.mark.skipif(version("wred") != "0.15", reason="Wred 0.15 decoding contract")
+async def test_query_decoding_preserves_validation_and_raw_cache_identity():
+    calls = 0
+    async with Cache() as cache:
+
+        @cache.cache()
+        @paginate()
+        @query(Filters)
+        async def handler(request, pagination, query):
+            nonlocal calls
+            calls += 1
+            return {"label": query.label, "revision": calls}
+
+        async def invoke(raw):
+            request = Request(
+                {"path": "/", "method": "GET", "query_string": raw}, None, None
+            )
+            return await handler(request)
+
+        # Both decode to replacement characters, but raw cache keys stay distinct.
+        for raw, revision in ((b"label=\xff", 1), (b"label=%EF%BF%BD", 2)):
+            for _ in range(2):
+                assert await invoke(raw) == {"label": "\ufffd", "revision": revision}
+        assert await invoke(b"label=first&label=last+value&empty=") == {
+            "label": "last value",
+            "revision": 3,
+        }
+        assert (await invoke(b"label=ok&limit=\xff"))[2] == 422
+        assert calls == 3
 
 
 async def test_guards_run_on_cache_hits_and_metadata_reaches_openapi():

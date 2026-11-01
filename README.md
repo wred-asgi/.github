@@ -3,7 +3,9 @@
 Shared resources for the [Wred organization](https://github.com/wred-asgi).
 
 - [Organization profile](profile/README.md)
-- [Extension contract v1](EXTENSIONS.md)
+- [Extension contract v1.1](EXTENSIONS.md)
+- [Production readiness and migration](PRODUCTION.md)
+- [Organization validation workflow](.github/workflows/extensions.yml)
 - [Cross-extension composition tests](tests/test_composition.py)
 
 ## Run the composition suite
@@ -25,3 +27,7 @@ python -m pytest tests
 Package-specific tests remain in their respective repositories. Changes to shared
 conventions should include a composition regression and be coordinated with the
 affected package releases. `profile/README.md` is the organization's landing page.
+
+For the full release gate, use `scripts/validate.py` with all service URLs set as
+described in [PRODUCTION.md](PRODUCTION.md). The quick composition command above
+does not substitute for service, installed-distribution, or dependency checks.
