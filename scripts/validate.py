@@ -49,6 +49,8 @@ def main():
     ]
     if missing:
         parser.error("Service tests are mandatory: set " + ", ".join(missing))
+    if shutil.which("redis-server") is None:
+        parser.error("Install redis-server for the isolated outage/restart tests")
     root, organization = options.extensions.resolve(), options.organization.resolve()
     packages = [root / ("wred-" + name) for name in PACKAGES]
     requirements = [

@@ -105,7 +105,8 @@ python .github/scripts/validate.py --extensions . --wred 0.15
 ```
 
 Use disposable services: tests migrate/drop SQL tables and create/drop MongoDB
-collections. The [reusable workflow](.github/workflows/extensions.yml) runs this
+collections. Install a local `redis-server` binary too: the outage/restart tests
+launch their own isolated instance. The [reusable workflow](.github/workflows/extensions.yml) runs this
 process on Python 3.11–3.14, including Wred 0.14 and the common runtime dependency floors in
 [constraints-minimum.txt](constraints-minimum.txt). Every
 extension calls it for pushes and pull requests; the organization also runs weekly
