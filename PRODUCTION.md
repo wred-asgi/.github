@@ -21,7 +21,8 @@ rollout. Wred remains a small HTTP core; extensions do not require a core regist
 
 All nine candidates admit Wred 0.15 and Python >=3.11. The shared contract is
 [revision 1.1](EXTENSIONS.md); its revision is independent of the Wred version.
-CORS/lifespan require Wred >=0.14; other extensions also declare 0.13 support.
+CORS, lifespan, and Jinja require Wred >=0.14; the other extensions also declare
+0.13 support.
 Organization CI covers 0.14 and 0.15. The Pydantic tox matrix additionally covers
 0.13. Test older per-package combinations before selecting them for deployment.
 
