@@ -10,7 +10,7 @@ permissions:
   contents: read
 jobs:
   contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -61,9 +61,11 @@ jobs:
           done
       - name: Start MongoDB replica set
         run: |
-          docker run -d --name wred-mongo -p 27017:27017 mongo:8 --replSet wred --bind_ip_all
+          trap 'docker logs wred-mongo || true' ERR
+          docker run -d --name wred-mongo -p 27017:27017 mongo:8.0 --replSet wred --bind_ip_all
           for i in $(seq 1 60); do
             if docker exec wred-mongo mongosh --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
+            if [ "$(docker inspect -f '{{.State.Running}}' wred-mongo)" != true ]; then docker logs wred-mongo; exit 1; fi
             sleep 1
           done
           docker exec wred-mongo mongosh --quiet --eval 'rs.initiate({_id:"wred",members:[{_id:0,host:"localhost:27017"}]})'
